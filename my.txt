@@ -1,0 +1,53 @@
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+Zugriff verweigert
+C:\my\ddd\BitCrystal\BitCrystal\BitCrystal-0.8.3r17-master\build_objects\*.o konnte nicht gefunden werden
+Project MESSAGE: Building with QRCode support
+Project MESSAGE: Building with UPNP support
+Project MESSAGE: Building without IPv6 support
+Project MESSAGE: Building with QRCode support
+Project MESSAGE: Building with UPNP support
+Project MESSAGE: Building without IPv6 support
+Project MESSAGE: Building with QRCode support
+Project MESSAGE: Building with UPNP support
+Project MESSAGE: Building without IPv6 support
+In file included from src\netbase.h:11:0,
+                 from src\net.h:19,
+                 from src\rpcnet.cpp:5:
+src\compat.h:14:0: warning: "FD_SETSIZE" redefined
+ #define FD_SETSIZE 1024 // max number of fds in fd_set
+ ^
+In file included from C:/mingw32/i686-w64-mingw32/include/winsock.h:36:0,
+                 from C:/mingw32/i686-w64-mingw32/include/windows.h:92,
+                 from c:\deps\openssl-1.0.1g\include/openssl/rand.h:67,
+                 from src\net.h:11,
+                 from src\rpcnet.cpp:5:
+C:/mingw32/i686-w64-mingw32/include/psdk_inc/_fd_types.h:13:0: note: this is the location of the previous definition
+ #define FD_SETSIZE 64
+ ^
+In file included from src\compat.h:15:0,
+                 from src\netbase.h:11,
+                 from src\net.h:19,
+                 from src\rpcnet.cpp:5:
+C:/mingw32/i686-w64-mingw32/include/winsock2.h:15:2: warning: #warning Please include winsock2.h before windows.h [-Wcpp]
+ #warning Please include winsock2.h before windows.h
+  ^
+src\groestl.c: In function 'groestl_small_close':
+src\groestl.c:2816:17: warning: variable 'buf' set but not used [-Wunused-but-set-variable]
+  unsigned char *buf;
+                 ^
+src\groestl.c: In function 'groestl_big_close':
+src\groestl.c:2952:17: warning: variable 'buf' set but not used [-Wunused-but-set-variable]
+  unsigned char *buf;
+                 ^

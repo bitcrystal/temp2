@@ -1,0 +1,294 @@
+# Copyright (c) 2009-2010 Satoshi Nakamoto
+# Distributed under the MIT/X11 software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+# Makefile for the MinGW g++ compiler/toolchain
+#
+# Assumes Berkeley DB, Boost, and OpenSSL have all been compiled and installed
+# into /usr/local (/usr/local/include, /usr/local/lib).
+#
+# If dependencies are somewhere else, run 'make DEPSDIR=/path/'
+#
+# Boost libraries are given wacky names that include the particular version of
+# boost you're using; set BOOST_SUFFIX appropriately.
+#
+# 'make clean' assumes it is running inside a MSYS shell, and uses 'rm'
+# to remove files.
+
+CXX ?= g++
+
+USE_UPNP:=1
+USE_IPV6:=-
+
+DEPSDIR?=/usr/local
+BOOST_SUFFIX?=-mgw49-mt-s-1_55
+
+INCLUDEPATHS= \
+ -I"$(CURDIR)" \
+ -I"$(CURDIR)/minizip/src" \
+ -I"c:/deps/boost_1_55_0" \
+ -I"c:/deps" \
+ -I"c:/deps/db-4.8.30.NC/build_unix" \
+ -I"c:/deps/openssl-1.0.1g/include"
+ 
+LIBPATHS= \
+ -L"$(CURDIR)/leveldb" \
+ -L"c:/deps/boost_1_55_0/stage/lib" \
+ -L"c:/deps/miniupnpc" \
+ -L"c:/deps/db-4.8.30.NC/build_unix" \
+ -L"c:/deps/openssl-1.0.1g"
+
+LIBS= \
+ -l leveldb \
+ -l memenv \
+ -l boost_system$(BOOST_SUFFIX) \
+ -l boost_filesystem$(BOOST_SUFFIX) \
+ -l boost_program_options$(BOOST_SUFFIX) \
+ -l boost_thread$(BOOST_SUFFIX) \
+ -l boost_chrono$(BOOST_SUFFIX) \
+ -l db_cxx \
+ -l ssl \
+ -l crypto
+ 
+DEFS=-DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE
+DEBUGFLAGS=-g
+CFLAGS=${ADDITIONALCCFLAGS} -mthreads -O2 -w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
+# enable: ASLR, DEP and large address aware
+LDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat -Wl,--large-address-aware -static
+
+TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
+
+ifndef USE_UPNP
+	override USE_UPNP = -
+endif
+ifneq (${USE_UPNP}, -)
+ LIBS += -l miniupnpc -l iphlpapi
+ DEFS += -DSTATICLIB -DUSE_UPNP=$(USE_UPNP)
+endif
+
+ifneq (${USE_IPV6}, -)
+	DEFS += -DUSE_IPV6=$(USE_IPV6)
+endif
+
+LIBS += -l kernel32 -l user32 -l gdi32 -l comdlg32 -l winspool -l winmm -l shell32 -l comctl32 -l ole32 -l oleaut32 -l uuid -l rpcrt4 -l advapi32 -l ws2_32 -l mswsock -l shlwapi
+
+# TODO: make the mingw builds smarter about dependencies, like the linux/osx builds are
+HEADERS = $(wildcard *.h) \
+          $(wildcard minizip/*.h) \
+		  $(wildcard functions_hook/*.h) \
+		  $(wildcard functions_hook/subhook/*.h) \
+		  $(wildcard functions_hook/polyhook_lib/Capstone/*.h) \
+		  $(wildcard functions_hook/polyhook_lib/Capstone/arch/*.h)
+
+OBJS= \
+    leveldb/libleveldb.a \
+	obj/windows_platform_defs.o \
+	obj/trees.o \
+	obj/zutil.o \
+	obj/inffast.o \
+	obj/infback.o \
+	obj/inftrees.o \
+	obj/adler32.o \
+    obj/inflate.o \
+    obj/deflate.o \
+    obj/crc32.o \
+    obj/ioapi.o \
+    obj/mztools.o \
+	obj/iowin32.o \
+	obj/unzip.o \
+	obj/zip.o \
+	obj/miniunz.o \
+	obj/minizip.o \
+	obj/utils.o \
+    obj/MCInst.o \
+    obj/MCInstrDesc.o \
+    obj/MCRegisterInfo.o \
+    obj/SStream.o \
+	obj/CommonBaseInfo.o \
+	obj/CommonDisassembler.o \
+	obj/CommonDisassemblerDecoder.o \
+	obj/CommonATTInstPrinter.o \
+	obj/CommonInstPrinter.o \
+	obj/CommonIntelInstPrinter.o \
+	obj/CommonMapping.o \
+	obj/CommonMCTargetDesc.o \
+	obj/CommonModule.o \
+	obj/cs.o \
+	obj/mhook_platform_defs.o \
+	obj/convert_functions.o \
+	obj/base64.o \
+	obj/random.o \
+	obj/base_security.o \
+    obj/alert.o \
+    obj/version.o \
+    obj/checkpoints.o \
+    obj/netbase.o \
+    obj/addrman.o \
+    obj/crypter.o \
+    obj/key.o \
+    obj/db.o \
+    obj/init.o \
+    obj/keystore.o \
+    obj/main.o \
+    obj/net.o \
+    obj/protocol.o \
+    obj/bitcoinrpc.o \
+    obj/rpcdump.o \
+    obj/rpcnet.o \
+    obj/rpcmining.o \
+    obj/rpcwallet.o \
+    obj/rpcblockchain.o \
+    obj/rpcrawtransaction.o \
+    obj/script.o \
+    obj/sync.o \
+    obj/util.o \
+    obj/wallet.o \
+    obj/walletdb.o \
+    obj/hash.o \
+    obj/bloom.o \
+    obj/noui.o \
+    obj/leveldb.o \
+    obj/txdb.o\
+    obj/blake.o\
+    obj/bmw.o\
+    obj/groestl.o\
+    obj/jh.o\
+    obj/keccak.o\
+    obj/skein.o
+
+
+all: bitcrystald.exe
+
+test check: test_bitcrystal.exe FORCE
+	test_bitcrystal.exe
+
+#
+# LevelDB support
+#
+DEFS += $(addprefix -I,$(CURDIR)/leveldb/include)
+DEFS += $(addprefix -I,$(CURDIR)/leveldb/helpers)
+
+leveldb/libleveldb.a:
+	cd leveldb && $(MAKE) CC=$(CC) CXX=$(CXX) OPT="$(CFLAGS)" TARGET_OS=NATIVE_WINDOWS libleveldb.a libmemenv.a && cd ..
+
+obj/%.o: %.cpp $(HEADERS)
+	$(CXX) -c $(CFLAGS) -o $@ $<
+
+obj/%.o: %.c $(HEADERS)
+	$(CXX) -c $(xCXXFLAGS) -fpermissive -o $@ $<
+
+obj/trees.o: minizip/trees.c minizip/trees.h
+	gcc -c -Wall -Werror -fpic -o obj/trees.o minizip/trees.c
+	
+obj/adler32.o: minizip/adler32.c
+	gcc -c -Wall -Werror -fpic -o obj/adler32.o minizip/adler32.c	
+
+obj/zutil.o: minizip/zutil.c minizip/zutil.h
+	gcc -c -Wall -Werror -fpic -o obj/zutil.o minizip/zutil.c
+	
+obj/infback.o: minizip/infback.c
+	gcc -c -Wall -Werror -fpic -o obj/infback.o minizip/infback.c
+	
+obj/inffast.o: minizip/inffast.c minizip/inffast.h
+	gcc -c -Wall -Werror -fpic -o obj/inffast.o minizip/inffast.c
+	
+obj/inftrees.o: minizip/inftrees.c minizip/inftrees.h
+	gcc -c -Wall -Werror -fpic -o obj/inftrees.o minizip/inftrees.c
+	
+obj/deflate.o: minizip/deflate.c minizip/deflate.h
+	gcc -c -Wall -Werror -fpic -o obj/deflate.o minizip/deflate.c
+	
+obj/inflate.o: minizip/inflate.c minizip/inflate.h
+	gcc -c -Wall -Werror -fpic -o obj/inflate.o minizip/inflate.c
+	
+obj/crc32.o: minizip/crc32.c minizip/crc32.h
+	gcc -c -Wall -Werror -fpic -o obj/crc32.o minizip/crc32.c
+	
+obj/ioapi.o: minizip/ioapi.c minizip/ioapi.h
+	gcc -c -Wall -Werror -fpic -o obj/ioapi.o minizip/ioapi.c
+
+obj/mztools.o: minizip/mztools.c minizip/mztools.h
+	gcc -c -Wall -Werror -fpic -o obj/mztools.o minizip/mztools.c
+	
+obj/iowin32.o: minizip/iowin32.c minizip/iowin32.h
+	gcc -c -Wall -Werror -fpic -o obj/iowin32.o minizip/iowin32.c
+	
+obj/unzip.o: minizip/unzip.c minizip/unzip.h
+	gcc -c -Wall -Werror -fpic -o obj/unzip.o minizip/unzip.c
+	
+obj/zip.o: minizip/zip.c minizip/zip.h
+	gcc -c -Wall -Werror -fpic -o obj/zip.o minizip/zip.c
+	
+obj/miniunz.o: minizip/miniunz.c minizip/miniunz.h
+	gcc -c -Wall -Werror -fpic -o obj/miniunz.o minizip/miniunz.c
+
+obj/minizip.o: minizip/minizip.c minizip/minizip.h
+	gcc -c -Wall -Werror -fpic -o obj/minizip.o minizip/minizip.c
+
+obj/utils.o: functions_hook/polyhook_lib/Capstone/my_utils.c functions_hook/polyhook_lib/Capstone/my_utils.h
+	gcc -c -Wall -Werror -fpic -o obj/utils.o functions_hook/polyhook_lib/Capstone/my_utils.c
+	
+obj/MCInst.o: functions_hook/polyhook_lib/Capstone/my_MCInst.c functions_hook/polyhook_lib/Capstone/my_MCInst.h
+	gcc -c -Wall -Werror -fpic -o obj/MCInst.o functions_hook/polyhook_lib/Capstone/my_MCInst.c
+
+obj/MCInstrDesc.o: functions_hook/polyhook_lib/Capstone/my_MCInstrDesc.c functions_hook/polyhook_lib/Capstone/my_MCInstrDesc.h
+	gcc -c -Wall -Werror -fpic -o obj/MCInstrDesc.o functions_hook/polyhook_lib/Capstone/my_MCInstrDesc.c
+	
+obj/MCRegisterInfo.o: functions_hook/polyhook_lib/Capstone/my_MCRegisterInfo.c functions_hook/polyhook_lib/Capstone/my_MCRegisterInfo.h
+	gcc -c -Wall -Werror -fpic -o obj/MCRegisterInfo.o functions_hook/polyhook_lib/Capstone/my_MCRegisterInfo.c
+	
+obj/SStream.o: functions_hook/polyhook_lib/Capstone/my_SStream.c functions_hook/polyhook_lib/Capstone/my_SStream.h
+	gcc -c -Wall -Werror -fpic -o obj/SStream.o functions_hook/polyhook_lib/Capstone/my_SStream.c
+	
+obj/CommonBaseInfo.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonBaseInfo.c functions_hook/polyhook_lib/Capstone/arch/my_CommonBaseInfo.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonBaseInfo.o functions_hook/polyhook_lib/Capstone/arch/my_CommonBaseInfo.c
+	
+obj/CommonDisassembler.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonDisassembler.c functions_hook/polyhook_lib/Capstone/arch/my_CommonDisassembler.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonDisassembler.o functions_hook/polyhook_lib/Capstone/arch/my_CommonDisassembler.c
+	
+obj/CommonDisassemblerDecoder.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonDisassemblerDecoder.c functions_hook/polyhook_lib/Capstone/arch/my_CommonDisassemblerDecoder.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonDisassemblerDecoder.o functions_hook/polyhook_lib/Capstone/arch/my_CommonDisassemblerDecoder.c
+	
+obj/CommonATTInstPrinter.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonATTInstPrinter.c functions_hook/polyhook_lib/Capstone/arch/my_CommonATTInstPrinter.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonATTInstPrinter.o functions_hook/polyhook_lib/Capstone/arch/my_CommonATTInstPrinter.c
+	
+obj/CommonInstPrinter.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonInstPrinter.c functions_hook/polyhook_lib/Capstone/arch/CommonInstPrinter.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonInstPrinter.o functions_hook/polyhook_lib/Capstone/arch/CommonInstPrinter.c
+	
+obj/CommonIntelInstPrinter.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonIntelInstPrinter.c functions_hook/polyhook_lib/Capstone/arch/my_CommonIntelInstPrinter.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonIntelInstPrinter.o functions_hook/polyhook_lib/Capstone/arch/my_CommonIntelInstPrinter.c
+	
+obj/CommonMapping.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonMapping.c functions_hook/polyhook_lib/Capstone/arch/my_CommonMapping.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonMapping.o functions_hook/polyhook_lib/Capstone/arch/my_CommonMapping.c
+	
+obj/CommonMCTargetDesc.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonMCTargetDesc.c functions_hook/polyhook_lib/Capstone/arch/my_CommonMCTargetDesc.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonMCTargetDesc.o functions_hook/polyhook_lib/Capstone/arch/my_CommonMCTargetDesc.c
+	
+obj/CommonModule.o: functions_hook/polyhook_lib/Capstone/arch/my_CommonModule.c functions_hook/polyhook_lib/Capstone/arch/my_CommonModule.h
+	gcc -c -Wall -Werror -fpic -o obj/CommonModule.o functions_hook/polyhook_lib/Capstone/arch/my_CommonModule.c
+	
+obj/cs.o: functions_hook/polyhook_lib/Capstone/my_cs.c functions_hook/polyhook_lib/Capstone/my_cs.h
+	gcc -c -Wall -Werror -fpic -o obj/cs.o functions_hook/polyhook_lib/Capstone/my_cs.c
+	
+obj/mhook_platform_defs.o: functions_hook/mhook_platform_defs.c functions_hook/mhook_platform_defs.h
+	gcc -c -Wall -Werror -fpic -o obj/mhook_platform_defs.o functions_hook/mhook_platform_defs.c
+	
+obj/windows_platform_defs.o: functions_hook/subhook/windows_platform_defs.c functions_hook/subhook/windows_platform_defs.h
+	gcc -c -Wall -Werror -fpic -o obj/windows_platform_defs.o functions_hook/windows_platform_defs.c
+
+bitcrystald.exe: $(OBJS:obj/%=obj/%)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
+
+TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
+
+obj-test/%.o: test/%.cpp $(HEADERS)
+	$(CXX) -c $(TESTDEFS) $(CFLAGS) -o $@ $<
+
+test_bitcrystal.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ -lboost_unit_test_framework$(BOOST_SUFFIX) $(LIBS)
+
+clean:
+	rm -f bitcrystald.exe test_bitcrystal.exe
+	rm -f obj/*
+	rm -f obj-test/*
+FORCE:

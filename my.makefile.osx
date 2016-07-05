@@ -1,0 +1,334 @@
+# -*- mode: Makefile; -*-
+# Copyright (c) 2011 Bitcoin Developers
+# Distributed under the MIT/X11 software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+# Mac OS X makefile for bitcrystal
+# Originally by Laszlo Hanyecz (solar@heliacal.net)
+
+CXX=llvm-g++
+DEPSDIR=/opt/local
+
+INCLUDEPATHS= \
+ -I"$(CURDIR)" \
+ -I"$(CURDIR)"/obj \
+ -I"$(DEPSDIR)/include" \
+ -I"$(DEPSDIR)/include/db48"
+
+LIBPATHS= \
+ -L"$(DEPSDIR)/lib" \
+ -L"$(DEPSDIR)/lib/db48"
+
+USE_UPNP:=1
+USE_IPV6:=1
+
+LIBS= -dead_strip
+
+TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
+
+ifdef STATIC
+# Build STATIC if you are redistributing the bitcrystald binary
+TESTLIBS += \
+ $(DEPSDIR)/lib/libboost_unit_test_framework-mt.a
+LIBS += \
+ $(DEPSDIR)/lib/db48/libdb_cxx-4.8.a \
+ $(DEPSDIR)/lib/libboost_system-mt.a \
+ $(DEPSDIR)/lib/libboost_filesystem-mt.a \
+ $(DEPSDIR)/lib/libboost_program_options-mt.a \
+ $(DEPSDIR)/lib/libboost_thread-mt.a \
+ $(DEPSDIR)/lib/libboost_chrono-mt.a \
+ $(DEPSDIR)/lib/libssl.a \
+ $(DEPSDIR)/lib/libcrypto.a \
+ -lz
+else
+TESTLIBS += \
+ -lboost_unit_test_framework-mt
+LIBS += \
+ -ldb_cxx-4.8 \
+ -lboost_system-mt \
+ -lboost_filesystem-mt \
+ -lboost_program_options-mt \
+ -lboost_thread-mt \
+ -lboost_chrono-mt \
+ -lssl \
+ -lcrypto \
+ -lz
+TESTDEFS += -DBOOST_TEST_DYN_LINK
+endif
+
+DEFS=-DMAC_OSX -DMSG_NOSIGNAL=0 -DBOOST_SPIRIT_THREADSAFE
+
+ifdef RELEASE
+# Compile for maximum compatibility and smallest size.
+# This requires that dependencies are compiled
+# the same way.
+CFLAGS = -mmacosx-version-min=10.5 -arch i386 -O3
+else
+DEBUGFLAGS = -g
+endif
+
+# ppc doesn't work because we don't support big-endian
+CFLAGS += -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter \
+    $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
+	
+HEADERS = $(wildcard *.h) \
+          $(wildcard minizip/*.h) \
+		  $(wildcard functions_hook/*.h) \
+		  $(wildcard functions_hook/subhook/*.h) \
+		  $(wildcard functions_hook/polyhook_lib/Capstone/*.h) \
+		  $(wildcard functions_hook/polyhook_lib/Capstone/arch/*.h)
+
+OBJS= \
+    leveldb/libleveldb.a \
+	obj/windows_platform_defs.o \
+	obj/trees.o \
+	obj/zutil.o \
+	obj/inffast.o \
+	obj/infback.o \
+	obj/inftrees.o \
+	obj/adler32.o \
+    obj/inflate.o \
+    obj/deflate.o \
+    obj/crc32.o \
+    obj/ioapi.o \
+    obj/mztools.o \
+	obj/iowin32.o \
+	obj/unzip.o \
+	obj/zip.o \
+	obj/miniunz.o \
+	obj/minizip.o \
+	obj/utils.o \
+    obj/MCInst.o \
+    obj/MCInstrDesc.o \
+    obj/MCRegisterInfo.o \
+    obj/SStream.o \
+	obj/CommonBaseInfo.o \
+	obj/CommonDisassembler.o \
+	obj/CommonDisassemblerDecoder.o \
+	obj/CommonATTInstPrinter.o \
+	obj/CommonInstPrinter.o \
+	obj/CommonIntelInstPrinter.o \
+	obj/CommonMapping.o \
+	obj/CommonMCTargetDesc.o \
+	obj/CommonModule.o \
+	obj/cs.o \
+	obj/mhook_platform_defs.o \
+	obj/convert_functions.o \
+	obj/base64.o \
+	obj/random.o \
+	obj/base_security.o \
+    obj/alert.o \
+    obj/version.o \
+    obj/checkpoints.o \
+    obj/netbase.o \
+    obj/addrman.o \
+    obj/crypter.o \
+    obj/key.o \
+    obj/db.o \
+    obj/init.o \
+    obj/keystore.o \
+    obj/main.o \
+    obj/net.o \
+    obj/protocol.o \
+    obj/bitcoinrpc.o \
+    obj/rpcdump.o \
+    obj/rpcnet.o \
+    obj/rpcmining.o \
+    obj/rpcwallet.o \
+    obj/rpcblockchain.o \
+    obj/rpcrawtransaction.o \
+    obj/script.o \
+    obj/sync.o \
+    obj/util.o \
+    obj/wallet.o \
+    obj/walletdb.o \
+    obj/hash.o \
+    obj/bloom.o \
+    obj/noui.o \
+    obj/leveldb.o \
+    obj/txdb.o\
+    obj/blake.o\
+    obj/bmw.o\
+    obj/groestl.o\
+    obj/jh.o\
+    obj/keccak.o\
+    obj/skein.o
+
+ifndef USE_UPNP
+	override USE_UPNP = -
+endif
+ifneq (${USE_UPNP}, -)
+	DEFS += -DUSE_UPNP=$(USE_UPNP)
+ifdef STATIC
+	LIBS += $(DEPSDIR)/lib/libminiupnpc.a
+else
+	LIBS += -lminiupnpc
+endif
+endif
+
+ifneq (${USE_IPV6}, -)
+	DEFS += -DUSE_IPV6=$(USE_IPV6)
+endif
+
+all: bitcrystald
+
+test check: test_bitcrystal FORCE
+	./test_bicrystal
+
+#
+# LevelDB support
+#
+LIBS += $(CURDIR)/leveldb/libleveldb.a $(CURDIR)/leveldb/libmemenv.a
+DEFS += $(addprefix -I,$(CURDIR)/leveldb/include)
+DEFS += $(addprefix -I,$(CURDIR)/leveldb/helpers)
+leveldb/libleveldb.a:
+	@echo "Building LevelDB ..." && cd leveldb && $(MAKE) CC=$(CC) CXX=$(CXX) OPT="$(CFLAGS)" libleveldb.a libmemenv.a && cd ..
+
+# auto-generated dependencies:
+-include obj/*.P
+-include obj-test/*.P
+
+obj/build.h: FORCE
+	/bin/sh ../share/genbuild.sh obj/build.h
+version.cpp: obj/build.h
+DEFS += -DHAVE_BUILD_INFO
+
+obj/%.o: %.cpp
+	$(CXX) -c $(CFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
+
+obj/%.o: %.c
+	$(CXX) -c $(CFLAGS) -fpermissive -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
+
+obj/trees.o: minizip/trees.c minizip/trees.h
+	gcc -c -o obj/trees.o minizip/trees.c
+	
+obj/adler32.o: minizip/adler32.c
+	gcc -c -o obj/adler32.o minizip/adler32.c	
+
+obj/zutil.o: minizip/zutil.c minizip/zutil.h
+	gcc -c -o obj/zutil.o minizip/zutil.c
+	
+obj/infback.o: minizip/infback.c
+	gcc -c -o obj/infback.o minizip/infback.c
+	
+obj/inffast.o: minizip/inffast.c minizip/inffast.h
+	gcc -c -o obj/inffast.o minizip/inffast.c
+	
+obj/inftrees.o: minizip/inftrees.c minizip/inftrees.h
+	gcc -c -o obj/inftrees.o minizip/inftrees.c
+	
+obj/deflate.o: minizip/deflate.c minizip/deflate.h
+	gcc -c -o obj/deflate.o minizip/deflate.c
+	
+obj/inflate.o: minizip/inflate.c minizip/inflate.h
+	gcc -c -o obj/inflate.o minizip/inflate.c
+	
+obj/crc32.o: minizip/crc32.c minizip/crc32.h
+	gcc -c -o obj/crc32.o minizip/crc32.c
+	
+obj/ioapi.o: minizip/ioapi.c minizip/ioapi.h
+	gcc -c -o obj/ioapi.o minizip/ioapi.c
+
+obj/mztools.o: minizip/mztools.c minizip/mztools.h
+	gcc -c -o obj/mztools.o minizip/mztools.c
+	
+obj/iowin32.o: minizip/iowin32.c minizip/iowin32.h
+	gcc -c -o obj/iowin32.o minizip/iowin32.c
+	
+obj/unzip.o: minizip/unzip.c minizip/unzip.h
+	gcc -c -o obj/unzip.o minizip/unzip.c
+	
+obj/zip.o: minizip/zip.c minizip/zip.h
+	gcc -c -o obj/zip.o minizip/zip.c
+	
+obj/miniunz.o: minizip/miniunz.c minizip/miniunz.h
+	gcc -c -o obj/miniunz.o minizip/miniunz.c
+
+obj/minizip.o: minizip/minizip.c minizip/minizip.h
+	gcc -c -o obj/minizip.o minizip/minizip.c
+
+obj/utils.o: functions_hook/polyhook_lib/Capstone/utils.c functions_hook/polyhook_lib/Capstone/utils.h
+	gcc -c -o obj/utils.o functions_hook/polyhook_lib/Capstone/utils.c
+	
+obj/MCInst.o: functions_hook/polyhook_lib/Capstone/MCInst.c functions_hook/polyhook_lib/Capstone/MCInst.h
+	gcc -c -o obj/MCInst.o functions_hook/polyhook_lib/Capstone/MCInst.c
+
+obj/MCInstrDesc.o: functions_hook/polyhook_lib/Capstone/MCInstrDesc.c functions_hook/polyhook_lib/Capstone/MCInstrDesc.h
+	gcc -c -o obj/MCInstrDesc.o functions_hook/polyhook_lib/Capstone/MCInstrDesc.c
+	
+obj/MCRegisterInfo.o: functions_hook/polyhook_lib/Capstone/MCRegisterInfo.c functions_hook/polyhook_lib/Capstone/MCRegisterInfo.h
+	gcc -c -o obj/MCRegisterInfo.o functions_hook/polyhook_lib/Capstone/MCRegisterInfo.c
+	
+obj/SStream.o: functions_hook/polyhook_lib/Capstone/SStream.c functions_hook/polyhook_lib/Capstone/SStream.h
+	gcc -c -o obj/SStream.o functions_hook/polyhook_lib/Capstone/SStream.c
+	
+obj/CommonBaseInfo.o: functions_hook/polyhook_lib/Capstone/arch/CommonBaseInfo.c functions_hook/polyhook_lib/Capstone/arch/CommonBaseInfo.h
+	gcc -c -o obj/CommonBaseInfo.o functions_hook/polyhook_lib/Capstone/arch/CommonBaseInfo.c
+	
+obj/CommonDisassembler.o: functions_hook/polyhook_lib/Capstone/arch/CommonDisassembler.c functions_hook/polyhook_lib/Capstone/arch/CommonDisassembler.h
+	gcc -c -o obj/CommonDisassembler.o functions_hook/polyhook_lib/Capstone/arch/CommonDisassembler.c
+	
+obj/CommonDisassemblerDecoder.o: functions_hook/polyhook_lib/Capstone/arch/CommonDisassemblerDecoder.c functions_hook/polyhook_lib/Capstone/arch/CommonDisassemblerDecoder.h
+	gcc -c -o obj/CommonDisassemblerDecoder.o functions_hook/polyhook_lib/Capstone/arch/CommonDisassemblerDecoder.c
+	
+obj/CommonATTInstPrinter.o: functions_hook/polyhook_lib/Capstone/arch/CommonATTInstPrinter.c functions_hook/polyhook_lib/Capstone/arch/CommonATTInstPrinter.h
+	gcc -c -o obj/CommonATTInstPrinter.o functions_hook/polyhook_lib/Capstone/arch/CommonATTInstPrinter.c
+	
+obj/CommonInstPrinter.o: functions_hook/polyhook_lib/Capstone/arch/CommonInstPrinter.c functions_hook/polyhook_lib/Capstone/arch/CommonInstPrinter.h
+	gcc -c -o obj/CommonInstPrinter.o functions_hook/polyhook_lib/Capstone/arch/CommonInstPrinter.c
+	
+obj/CommonIntelInstPrinter.o: functions_hook/polyhook_lib/Capstone/arch/CommonIntelInstPrinter.c functions_hook/polyhook_lib/Capstone/arch/CommonIntelInstPrinter.h
+	gcc -c -o obj/CommonIntelInstPrinter.o functions_hook/polyhook_lib/Capstone/arch/CommonIntelInstPrinter.c
+	
+obj/CommonMapping.o: functions_hook/polyhook_lib/Capstone/arch/CommonMapping.c functions_hook/polyhook_lib/Capstone/arch/CommonMapping.h
+	gcc -c -o obj/CommonMapping.o functions_hook/polyhook_lib/Capstone/arch/CommonMapping.c
+	
+obj/CommonMCTargetDesc.o: functions_hook/polyhook_lib/Capstone/arch/CommonMCTargetDesc.c functions_hook/polyhook_lib/Capstone/arch/CommonMCTargetDesc.h
+	gcc -c -o obj/CommonMCTargetDesc.o functions_hook/polyhook_lib/Capstone/arch/CommonMCTargetDesc.c
+	
+obj/CommonModule.o: functions_hook/polyhook_lib/Capstone/arch/CommonModule.c functions_hook/polyhook_lib/Capstone/arch/CommonModule.h
+	gcc -c -o obj/CommonModule.o functions_hook/polyhook_lib/Capstone/arch/CommonModule.c
+	
+obj/cs.o: functions_hook/polyhook_lib/Capstone/cs.c functions_hook/polyhook_lib/Capstone/cs.h
+	gcc -c -o obj/cs.o functions_hook/polyhook_lib/Capstone/cs.c
+	
+obj/mhook_platform_defs.o: functions_hook/mhook_platform_defs.c functions_hook/mhook_platform_defs.h
+	gcc -c -o obj/mhook_platform_defs.o functions_hook/mhook_platform_defs.c
+
+obj/windows_platform_defs.o: functions_hook/subhook/windows_platform_defs.c functions_hook/subhook/windows_platform_defs.h
+	gcc -c -o obj/windows_platform_defs.o functions_hook/subhook/windows_platform_defs.c
+
+bitcrystald: $(OBJS:obj/%=obj/%)
+	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
+
+TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
+
+obj-test/%.o: test/%.cpp
+	$(CXX) -c $(TESTDEFS) $(CFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
+
+test_bitcrystal: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
+	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) $(TESTLIBS)
+
+clean:
+	-rm -f bitcrystald test_bitcrystal
+	-rm -f obj/*.o
+	-rm -f obj-test/*.o
+	-rm -f obj/*.P
+	-rm -f obj-test/*.P
+	-rm -f obj/build.h
+	-cd leveldb && $(MAKE) clean || true
+
+FORCE:
+v

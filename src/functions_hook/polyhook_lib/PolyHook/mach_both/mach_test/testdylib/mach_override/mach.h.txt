@@ -1,0 +1,17 @@
+#ifndef MACH_OVERRIDE_EXTENSIONS
+#define MACH_OVERRIDE_EXTENSIONS
+	
+#if defined(__ppc__) || defined(__POWERPC__)
+typedef struct mopc_
+{
+	long oldInstruction;
+	BranchIsland * re;
+	BranchIsland * es;
+	mach_error_t err;
+} mopc;
+int my__CompareAndSwap(long a,long b,long *c);
+mach_error_t mach_override_ptr_ppc(void *originalFunctionAddress,const void *overrideFunctionAddress,void **originalFunctionReentryIsland,mopc * oldinfo );
+mach_error_t mach_unoverride_ptr_ppc(void *originalFunctionAddress,const void *overrideFunctionAddress,void **originalFunctionReentryIsland,mopc * oldinfo );
+#endif
+
+#endif

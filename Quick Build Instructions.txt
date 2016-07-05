@@ -1,0 +1,41 @@
+Quick Start for building bitquarkd in Unix/Linux
+-----------------------------------
+sudo apt-get install build-essential
+sudo apt-get install libssl-dev
+sudo apt-get install libboost-all-dev
+sudo apt-get install libdb4.8-dev
+sudo apt-get install libdb4.8++-dev
+sudo apt-get install libminiupnpc-dev
+
+cd src/leveldb
+chmod +x build_detect_platform
+./build_detect_platform build_config.mk ./
+cd ..
+make -f makefile.unix
+cd ..
+qmake "USE_QRCODE=1" "USE_UPNP=1" "USE_IPV6=-" bitquark-qt.pro
+make
+
+First, make sure that the required packages for Qt4 development of your distribution are installed, these are
+
+for Debian and Ubuntu  <= 11.10
+
+apt-get install qt4-qmake libqt4-dev build-essential libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-thread-dev libssl-dev libdb4.8++-dev
+
+for Ubuntu >= 12.04
+
+apt-get install qt4-qmake libqt4-dev build-essential libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-thread-dev libssl-dev libdb++-dev libminiupnpc-dev
+
+An executable named `bitquark-qt` will be built.
+Alternatively, install `Qt Creator`_ and open the `bitquark-qt.pro` file.
+
+***Deps
+http://www.openssl.org/source/openssl-1.0.1g.tar.gz
+http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz
+http://sourceforge.net/projects/boost/files/boost/1.55.0/boost_1_55_0.tar.gz/download
+http://miniupnp.tuxfamily.org/files/download.php?file=miniupnpc-1.9.tar.gz
+
+***Deps for QRCode
+protobuff-2.5.0
+qrencode-3.4.3
+libpng-1.6.10

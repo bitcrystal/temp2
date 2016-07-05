@@ -1,0 +1,3 @@
+#!/bin/bash
+e=$1
+du ${e} | cut -d"${e:0:1}" -f1

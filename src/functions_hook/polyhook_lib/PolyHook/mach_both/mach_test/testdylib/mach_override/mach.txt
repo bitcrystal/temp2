@@ -1,0 +1,149 @@
+#include "mach_override_extensions.h"
+ 
+#if defined(__ppc__) || defined(__POWERPC__) 
+	int my__CompareAndSwap(long a,long b,long *c)
+	{
+		if(*c==a)
+		{
+			*c=b;
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+	
+	 	    mach_error_t
+ 	mach_unoverride_ptr_ppc(
+ 	        void *originalFunctionAddress,
+ 	    const void *overrideFunctionAddress,
+ 	    void **originalFunctionReentryIsland,mopc * oldinfo )
+ 	{
+			if(originalFunctionAddress == 0 || overrideFunctionAddress == 0 || oldinfo == 0)
+				return err_cannot_override;
+			if(mopc->oldInstruction)
+			{
+				long * orgFa=(long*)originalFunctionAddress;
+				*orgFa=mopc->oldInstruction;
+			}
+			if( mopc->re )
+			{
+ 	            freeBranchIsland( mopc->re );
+				mopc->re=0;
+			}
+ 	        if( mopc->es )
+			{
+ 	            freeBranchIsland( mopc->es );
+	       		mopc->es=0;
+			}
+			return err_none;
+		 #else
+			return err_cannot_override;
+		 #endif
+	}
+	
+ 	    mach_error_t
+ 	mach_override_ptr_ppc(
+ 	        void *originalFunctionAddress,
+ 	    const void *overrideFunctionAddress,
+ 	    void **originalFunctionReentryIsland,mopc * oldinfo )
+ 	{
+ 	        if( originalFunctionAddress == 0 || overrideFunctionAddress == 0 || oldinfo == 0)
+				return err_cannot_override;
+ 	        
+ 	        // this addresses overriding such functions as AudioOutputUnitStart()
+ 	        // test with modified DefaultOutputUnit project
+ 	
+ 	        long    *originalFunctionPtr = (long*) originalFunctionAddress;
+ 	        mach_error_t    err = err_none;
+ #if defined(__ppc__) || defined(__POWERPC__)   	        
+ 	        //      Ensure first instruction isn't 'mfctr'.
+ 	        #define kMFCTRMask                      0xfc1fffff
+ 	        #define kMFCTRInstruction       0x7c0903a6
+ 	        
+ 	        long    originalInstruction = *originalFunctionPtr;
+ 	        if( !err && ((originalInstruction & kMFCTRMask) == kMFCTRInstruction) )
+ 	                err = err_cannot_override;
+ 	        
+ 	        //      Make the original function implementation writable.
+ 	        if( !err ) {
+ 	                err = vm_protect( mach_task_self(),
+ 	                                (vm_address_t) originalFunctionPtr, 8, false,
+ 	                                (VM_PROT_ALL | VM_PROT_COPY) );
+ 	                if( err )
+ 	                        err = vm_protect( mach_task_self(),
+ 	                                        (vm_address_t) originalFunctionPtr, 8, false,
+ 	                                        (VM_PROT_DEFAULT | VM_PROT_COPY) );
+ 	        }
+ 	        if (err) fprintf(stderr, "err = %x %s:%d\n", err, __FILE__, __LINE__);
+ 	        
+ 	        //      Allocate and target the escape island to the overriding function.
+ 	        BranchIsland    *escapeIsland = NULL;
+ 	        if( !err )      
+ 	                err = allocateBranchIsland( &escapeIsland, originalFunctionAddress );
+ 	                if (err) fprintf(stderr, "err = %x %s:%d\n", err, __FILE__, __LINE__);
+
+ 	        if( !err )
+ 	                err = setBranchIslandTarget( escapeIsland, overrideFunctionAddress, 0 );
+ 	        
+ 	        //      Build the branch absolute instruction to the escape island.
+ 	        long    branchAbsoluteInstruction = 0; // Set to 0 just to silence warning.
+ 	        if( !err ) {
+ 	                long escapeIslandAddress = ((long) escapeIsland) & 0x3FFFFFF;
+ 	                branchAbsoluteInstruction = 0x48000002 | escapeIslandAddress;
+ 	        }
+ 	        
+ 	        //      Optionally allocate & return the reentry island. This may contain relocated
+ 	        //  jmp instructions and so has all the same addressing reachability requirements
+ 	        //  the escape island has to the original function, except the escape island is
+ 	        //  technically our original function.
+ 	        BranchIsland    *reentryIsland = NULL;
+ 	        if( !err && originalFunctionReentryIsland ) {
+ 	                err = allocateBranchIsland( &reentryIsland, escapeIsland);
+ 	                if( !err )
+ 	                        *originalFunctionReentryIsland = reentryIsland;
+ 	        }
+ 	          
+ 	        //      Atomically:
+ 	        //      o If the reentry island was allocated:
+ 	        //              o Insert the original instruction into the reentry island.
+ 	        //              o Target the reentry island at the 2nd instruction of the
+ 	        //                original function.
+ 	        //      o Replace the original instruction with the branch absolute.
+ 	        if( !err ) {
+ 	                int escapeIslandEngaged = 0;
+ 	                do {
+ 	                        if( reentryIsland )
+ 	                                err = setBranchIslandTarget( reentryIsland,
+ 	                                                (void*) (originalFunctionPtr+1), originalInstruction );
+ 	                        if( !err ) {
+ 	                                escapeIslandEngaged = my__CompareAndSwap( originalInstruction,
+ 	                                                                                branchAbsoluteInstruction,
+ 	                                                                                originalFunctionPtr );
+ 	                                if( !escapeIslandEngaged ) {
+ 	                                        //      Someone replaced the instruction out from under us,
+ 	                                        //      re-read the instruction, make sure it's still not
+ 	                                        //      'mfctr' and try again.
+ 	                                        originalInstruction = *originalFunctionPtr;
+ 	                                        if( (originalInstruction & kMFCTRMask) == kMFCTRInstruction)
+ 	                                                err = err_cannot_override;
+ 	                                }
+ 	                        }
+ 	                } while( !err && !escapeIslandEngaged );
+ 	        }
+ 	        
+ 	        //      Clean up on error.
+ 	        if( err ) {
+ 	                if( reentryIsland )
+ 	                        freeBranchIsland( reentryIsland );
+ 	                if( escapeIsland )
+ 	                        freeBranchIsland( escapeIsland );
+ 	        }
+#else
+			err = err_cannot_override;
+#endif
+			mopc->oldInstruction=err?0:originalInstruction;
+			mopc->re=err?0:reentryIsland;
+			mopc->es=err?0:escapeIsland;
+ 	        return err;
+ 	}
+#endif

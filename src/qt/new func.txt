@@ -1,0 +1,6 @@
+    //Store
+    QColor color;
+    QVariant v(color.rgba());
+     
+    //Retrieve
+    QColor color = QColor::fromRgba(v.toUInt());

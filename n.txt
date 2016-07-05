@@ -1,0 +1,7 @@
+rm: das Entfernen von »src/leveldb/libleveldb.a“ ist nicht möglich: Datei oder Verzeichnis nicht gefunden
+/bin/sh: 1: ./build_detect_platform: not found
+src/leveldb/Makefile:18: build_config.mk: Datei oder Verzeichnis nicht gefunden
+make: Warning: File 'src/leveldb/Makefile' has modification time 0,093 s in the future
+make: *** No rule to make target 'build_config.mk'.  Schluss.
+Paketlisten werden gelesen...
+Abhängigkeitsbaum wird aufgebaut....
