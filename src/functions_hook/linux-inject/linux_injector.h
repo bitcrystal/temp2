@@ -3,9 +3,9 @@
 
 #include "linux_injector_helper.h"
 
-#ifdef __cplusplus
-	extern "C" {
-#endif
+//#ifdef __cplusplus
+//	extern "C" {
+//#endif
 
 typedef struct LINUX_INJECTOR_S_
 {
@@ -67,8 +67,8 @@ int LINUX__Injector__inject(LINUX_INJECTOR_S_t mas);
 
 pid_t LINUX__Injector__getProcessByName(const char *name);
 
-#ifdef __cplusplus
-	}
-#endif
+//#ifdef __cplusplus
+//	}
+//#endif
 
 #endif

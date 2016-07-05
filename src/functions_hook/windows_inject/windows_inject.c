@@ -7,85 +7,52 @@
 #endif
 
 #ifdef INJECT_METHOD_1
-HMODULE k_Injector__TryInjectDllA(DWORD adw_ProcessId, const char * as_DllFile) 
-{ 
-    //Find the address of the LoadLibrary api, luckily for us, it is loaded in the same address for every process 
-    HMODULE hLocKernel32 = GetModuleHandleA("KERNEL32"); 
-    FARPROC hLocLoadLibrary = GetProcAddressA(hLocKernel32, "LoadLibraryA"); 
-     
-    //Adjust token privileges to open system processes 
-    HANDLE hToken; 
-    TOKEN_PRIVILEGES tkp; 
-    if(OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) 
-    { 
-        LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tkp.Privileges[0].Luid); 
-        tkp.PrivilegeCount = 1; 
-        tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED; 
-        AdjustTokenPrivileges(hToken, 0, &tkp, sizeof(tkp), NULL, NULL); 
-        CloseHandle(hToken); 
-    } 
+void EnableDebugPriv()
+{
+	static BOOL have_priv=FALSE;
+	if(have_priv==TRUE)
+		return;
+    HANDLE hToken;
+    LUID luid;
+    TOKEN_PRIVILEGES tkp;
 
-    //Open the process with all access 
-    HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, adw_ProcessId); 
-    if (hProc == NULL) 
-        return NULL; 
+    OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken);
 
-    //Allocate memory to hold the path to the Dll File in the process's memory 
-    LPVOID hRemoteMem = VirtualAllocEx(hProc, NULL, strlen(as_DllFile)*sizeof(char), MEM_COMMIT, PAGE_READWRITE); 
+    LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid);
 
-    //Write the path to the Dll File in the location just created 
-    DWORD numBytesWritten; 
-    WriteProcessMemory(hProc, hRemoteMem, as_DllFile, strlen(as_DllFile)*sizeof(char), &numBytesWritten); 
+    tkp.PrivilegeCount = 1;
+    tkp.Privileges[0].Luid = luid;
+    tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-    //Create a remote thread that starts begins at the LoadLibrary function and is passed are memory pointer 
-    HANDLE hRemoteThread = CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, hRemoteMem, 0, NULL); 
+    AdjustTokenPrivileges(hToken, FALSE, &tkp, sizeof(tkp), NULL, NULL);
 
-    //Wait for the thread to finish 
-    WaitForSingleObject( hRemoteThread, INFINITE ); 
-    DWORD  hLibModule = 0; 
-    GetExitCodeThread( hRemoteThread, &hLibModule ); 
-
-    //Free the memory created on the other process 
-    VirtualFreeEx(hProc, hRemoteMem, strlen(as_DllFile)*sizeof(char), MEM_RELEASE); 
-
-    //Release the handle to the other process 
-    CloseHandle(hProc); 
-
-    return (HMODULE)hLibModule; 
-} 
-
+    CloseHandle(hToken); 
+	have_priv=TRUE;
+}	
+#if defined(UNICODE) || defined(_UNICODE)
 HMODULE k_Injector__TryInjectDllW(DWORD adw_ProcessId, const wchar_t * as_DllFile) 
 { 
     //Find the address of the LoadLibrary api, luckily for us, it is loaded in the same address for every process 
-    HMODULE hLocKernel32 = GetModuleHandleW(L"KERNEL32"); 
-    FARPROC hLocLoadLibrary = GetProcAddressW(hLocKernel32, "LoadLibraryW"); 
+    HMODULE hLocKernel32 = (HMODULE)GetModuleHandleW(L"KERNEL32"); 
+    FARPROC hLocLoadLibrary = (FARPROC)GetProcAddress(hLocKernel32, "LoadLibraryW"); 
      
     //Adjust token privileges to open system processes 
-    HANDLE hToken; 
-    TOKEN_PRIVILEGES tkp; 
-    if(OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) 
-    { 
-        LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tkp.Privileges[0].Luid); 
-        tkp.PrivilegeCount = 1; 
-        tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED; 
-        AdjustTokenPrivileges(hToken, 0, &tkp, sizeof(tkp), NULL, NULL); 
-        CloseHandle(hToken); 
-    } 
+    EnableDebugPriv();
 
     //Open the process with all access 
-    HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, adw_ProcessId); 
+    HANDLE hProc = (HANDLE)OpenProcess(PROCESS_ALL_ACCESS, FALSE, adw_ProcessId); 
     if (hProc == NULL) 
         return NULL; 
 
     //Allocate memory to hold the path to the Dll File in the process's memory 
-    LPVOID hRemoteMem = VirtualAllocEx(hProc, NULL, wcslen(as_DllFile), MEM_COMMIT, PAGE_READWRITE); 
+    LPVOID hRemoteMem = (LPVOID)VirtualAllocEx(hProc, NULL, wcslen(as_DllFile), MEM_COMMIT, PAGE_READWRITE); 
 
     //Write the path to the Dll File in the location just created 
     DWORD numBytesWritten; 
     WriteProcessMemory(hProc, hRemoteMem, as_DllFile, wcslen(as_DllFile), &numBytesWritten); 
 
     //Create a remote thread that starts begins at the LoadLibrary function and is passed are memory pointer 
-    HANDLE hRemoteThread = CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, hRemoteMem, 0, NULL); 
+    HANDLE hRemoteThread = (HANDLE)CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, hRemoteMem, 0, NULL); 
 
     //Wait for the thread to finish 
     WaitForSingleObject( hRemoteThread, INFINITE ); 
@@ -110,12 +77,12 @@ BOOL k_Injector__TryUnInjectDllW(DWORD adw_ProcessId, HMODULE ah_ModuleHandle)
 
     BOOL lb_ReturnValue = FALSE; 
 
-    HMODULE hLocKernel32 = GetModuleHandleW(L"KERNEL32"); 
-    FARPROC hLocLoadLibrary = GetProcAddressW(hLocKernel32, L"FreeLibrary"); 
+    HMODULE hLocKernel32 = (HMODULE)GetModuleHandleW(L"KERNEL32"); 
+    FARPROC hLocLoadLibrary = (FARPROC)GetProcAddress(hLocKernel32, "FreeLibrary"); 
 
     if(ah_ModuleHandle != NULL) 
     { 
-        HANDLE hRemoteThread = CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, (void*)ah_ModuleHandle, 0, NULL );
+        HANDLE hRemoteThread = (HANDLE)CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, (void*)ah_ModuleHandle, 0, NULL );
 
         if( hRemoteThread != NULL ) 
         { 
@@ -133,21 +100,88 @@ BOOL k_Injector__TryUnInjectDllW(DWORD adw_ProcessId, HMODULE ah_ModuleHandle)
     return lb_ReturnValue; 
 }
 
+DWORD GetProcessIdByNameW(const wchar_t * processName) // non-conflicting function name
+{
+    PROCESSENTRY32W pt;
+    HANDLE hsnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if( hsnap == INVALID_HANDLE_VALUE )
+		return 0;
+    pt.dwSize = sizeof(PROCESSENTRY32W);
+    if (Process32FirstW(hsnap, &pt)) { // must call this first
+        do {
+            if (wcscmp(pt.szExeFile, processName) == 0) {
+                CloseHandle(hsnap);
+                return pt.th32ProcessID;
+            }
+        } while (Process32NextW(hsnap, &pt));
+    }
+    CloseHandle(hsnap); // close handle on failure
+    return 0;
+}
+
+HANDLE GetProcessHandleByNameW(const wchar_t * processname)
+{
+	DWORD pid = GetProcessIdByNameW(processname);
+	if(pid==0)
+		return NULL;
+	EnableDebugPriv();
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+    return hProcess;
+}
+#else
+HMODULE k_Injector__TryInjectDllA(DWORD adw_ProcessId, const char * as_DllFile) 
+{ 
+    //Find the address of the LoadLibrary api, luckily for us, it is loaded in the same address for every process 
+    HMODULE hLocKernel32 = GetModuleHandleA("KERNEL32"); 
+    FARPROC hLocLoadLibrary = (FARPROC)GetProcAddress(hLocKernel32, "LoadLibraryA"); 
+     
+    //Adjust token privileges to open system processes 
+    EnableDebugPriv();
+
+    //Open the process with all access 
+    HANDLE hProc = (HANDLE)OpenProcess(PROCESS_ALL_ACCESS, FALSE, adw_ProcessId); 
+    if (hProc == NULL) 
+        return NULL; 
+
+    //Allocate memory to hold the path to the Dll File in the process's memory 
+    LPVOID hRemoteMem = (LPVOID)VirtualAllocEx(hProc, NULL, strlen(as_DllFile)*sizeof(char), MEM_COMMIT, PAGE_READWRITE); 
+
+    //Write the path to the Dll File in the location just created 
+    DWORD numBytesWritten; 
+    WriteProcessMemory(hProc, hRemoteMem, as_DllFile, strlen(as_DllFile)*sizeof(char), &numBytesWritten); 
+
+    //Create a remote thread that starts begins at the LoadLibrary function and is passed are memory pointer 
+    HANDLE hRemoteThread = (HANDLE)CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, hRemoteMem, 0, NULL); 
+
+    //Wait for the thread to finish 
+    WaitForSingleObject( hRemoteThread, INFINITE ); 
+    DWORD  hLibModule = 0; 
+    GetExitCodeThread( hRemoteThread, &hLibModule ); 
+
+    //Free the memory created on the other process 
+    VirtualFreeEx(hProc, hRemoteMem, strlen(as_DllFile)*sizeof(char), MEM_RELEASE); 
+
+    //Release the handle to the other process 
+    CloseHandle(hProc); 
+
+    return (HMODULE)hLibModule; 
+} 
+
 BOOL k_Injector__TryUnInjectDllA(DWORD adw_ProcessId, HMODULE ah_ModuleHandle) 
 { 
     //Open the process with all access 
-    HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, adw_ProcessId); 
+    HANDLE hProc = (HANDLE)OpenProcess(PROCESS_ALL_ACCESS, FALSE, adw_ProcessId); 
     if (hProc == NULL) 
         return FALSE; 
 
     BOOL lb_ReturnValue = FALSE; 
 
-    HMODULE hLocKernel32 = GetModuleHandleA("KERNEL32"); 
-    FARPROC hLocLoadLibrary = GetProcAddressA(hLocKernel32, "FreeLibrary"); 
+    HMODULE hLocKernel32 = (HMODULE)GetModuleHandleA("KERNEL32"); 
+    FARPROC hLocLoadLibrary = (FARPROC)GetProcAddress(hLocKernel32, "FreeLibrary"); 
 
     if(ah_ModuleHandle != NULL) 
     { 
-        HANDLE hRemoteThread = CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, (void*)ah_ModuleHandle, 0, NULL );
+        HANDLE hRemoteThread = (HANDLE)CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)hLocLoadLibrary, (void*)ah_ModuleHandle, 0, NULL );
 
         if( hRemoteThread != NULL ) 
         { 
@@ -165,6 +199,35 @@ BOOL k_Injector__TryUnInjectDllA(DWORD adw_ProcessId, HMODULE ah_ModuleHandle)
     return lb_ReturnValue; 
 }
 
+DWORD GetProcessIdByNameA(const char * processName) // non-conflicting function name
+{
+    PROCESSENTRY32A pt;
+    HANDLE hsnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if( hsnap == INVALID_HANDLE_VALUE )
+		return 0;
+    pt.dwSize = sizeof(PROCESSENTRY32A);
+    if (Process32FirstA(hsnap, &pt)) { // must call this first
+        do {
+            if (strcmp(pt.szExeFile, processName) == 0) {
+                CloseHandle(hsnap);
+                return pt.th32ProcessID;
+            }
+        } while (Process32NextA(hsnap, &pt));
+    }
+    CloseHandle(hsnap); // close handle on failure
+    return 0;
+}
+
+HANDLE GetProcessHandleByNameA(const char * processname)
+{
+	DWORD pid = GetProcessIdByNameA(processname);
+	if(pid==0)
+		return NULL;
+	EnableDebugPriv();
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+	return hProcess;
+}
+#endif
 #elif defined(INJECT_METHOD_2)
 /*BOOL AdjustDacl(HANDLE h, DWORD DesiredAccess) 
 { 
@@ -420,4 +483,5 @@ extern "C" __declspec(dllexport) void __cdecl InstallHook()
         } 
     } 
 }*/
+#endif
 #endif
